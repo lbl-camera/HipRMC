@@ -1,1 +1,2 @@
-High-Performance Reverse Monte Carlo for Transmission SAXS
+HipRMC: High-Performance Reverse Monte Carlo for Transmission SAXS
+
