@@ -41,10 +41,11 @@ def Metropolis(x_old, y_old, x_new, y_new, old_point, new_point, delta_chi, simu
     return acceptance, chi_old
 
 def random_initial(image:np.array):
-    noise = np.random.random(image.shape)
     initial = np.zeros_like(image)
-    initial[noise > np.count_nonzero(image == 1) / mul(*image.shape)] = 0
-    initial[noise < np.count_nonzero(image == 1) / mul(*image.shape)] = 1
+    initial2 = initial.reshape(mul(*image.shape))
+    initial2[: np.count_nonzero(image == 1)] = 1
+    np.random.shuffle(initial2)
+    initial = initial2.reshape(image.shape)
     return initial
 
 def rmc(image:np.array, T, initial:np.array=None):
@@ -56,7 +57,7 @@ def rmc(image:np.array, T, initial:np.array=None):
     F_old = fourier_transform(simulated_image)
     chi_old = chi_square(F_old, F_image)
     error, run_count, Temperature = [], [], []
-    for t in progressbar.progressbar(range(0, 50000)):
+    for t in progressbar.progressbar(range(0, 40000)):
         move_count = 0.0
         acceptance = 0.0
         for _ in range(np.count_nonzero(simulated_image == 1)):
