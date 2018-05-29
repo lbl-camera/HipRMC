@@ -7,8 +7,9 @@ import progressbar
 def fourier_transform(m):
     return fftpack.fft2(m)
 
-def chi_square(simulation, image):
-    return np.sum((np.square(abs(simulation - image))/abs(image)))
+
+def chi_square(ft_simulation, ft_image):
+    return np.sum((np.square(abs(abs(ft_simulation) - abs(ft_image))) / abs(ft_image)))
 
 
 # def DFT_Matrix(x_old, y_old, x_new, y_new, F_old, simulated_image):
@@ -56,8 +57,7 @@ def rmc(image:np.array, T, initial:np.array=None):
     F_image = fourier_transform(image)
     F_old = fourier_transform(simulated_image)
     chi_old = chi_square(F_old, F_image)
-    error, run_count, Temperature = [], [], []
-    for t in progressbar.progressbar(range(0, 40000)):
+    for _ in progressbar.progressbar(range(0, 30000)):
         move_count = 0.0
         acceptance = 0.0
         for _ in range(np.count_nonzero(simulated_image == 1)):
@@ -83,19 +83,12 @@ def rmc(image:np.array, T, initial:np.array=None):
             new_array = np.zeros_like(image)
             new_array[x_new][y_new] = 1
             # U = DFT_Matrix(x_old, y_old, x_new, y_new, F_old, simulated_image)
-            F_new = F_old - fftpack.fft2(old_array) + fftpack.fft2(new_array)
+            F_new = F_old - fourier_transform(old_array) + fourier_transform(new_array)
             chi_new = chi_square(F_new, F_image)
             delta_chi = chi_new - chi_old
             acceptance, chi_old = Metropolis(x_old, y_old, x_new, y_new, old_point, new_point, delta_chi,
                                              simulated_image, T, acceptance, chi_old, chi_new)
             F_old = fourier_transform(simulated_image)
         T = T * 0.9998
-        error.append(chi_old)
-        run_count.append(t)
-
-    plt.plot(run_count, error, 'b-')
-    plt.xlabel('Monte Carlo Iteration')
-    plt.ylabel('Chi-Squared Value')
-    plt.show()
 
     return simulated_image

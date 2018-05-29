@@ -1,26 +1,30 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy import misc
 import hiprmc
 from skimage.draw import polygon
 
 def test_simple():
     N = 25  # size of image (NxN)
-    disc, rand_start, DFT = np.zeros((N, N)), np.zeros((N, N)), np.zeros((N, N))
-    T = 50000.0
+    disc = np.zeros((N, N))
+    T = 1000
+    # This bit creates a disc to try and model via RMC
+    for i in range(0, N):
+        for j in range(0, N):
+            r = (i - N / 2) ** 2 + (j - N / 2) ** 2
+            if r < (N / 2 - 2) ** 2 and r > (N / 2 - 4) ** 2:
+                disc[i, j] = 1
+            else:
+                disc[i, j] = 0
 
-    # # This bit creates a disc to try and model via RMC
-    # for i in range(0, N):
-    #     for j in range(0, N):
-    #         r = (i - N / 2) ** 2 + (j - N / 2) ** 2
-    #         if r < (N / 2 - 2) ** 2 and r > (N / 2 - 4) ** 2:
-    #             disc[i, j] = 1
-    #         else:
-    #             disc[i, j] = 0
+    # r = np.array([1, 12, 18, 1])
+    # c = np.array([1, 17, 14, 1])
+    # rr, cc = polygon(r, c)
+    # disc[rr, cc] = 1
 
-    r = np.array([1, 12, 18, 1])
-    c = np.array([1, 17, 14, 1])
-    rr, cc = polygon(r, c)
-    disc[rr, cc] = 1
+    # picture = Image.open('saxs10_128.tiff')
+    # disc = misc.imread('saxs10_128.tiff')
+    # print(disc)
 
     initial = hiprmc.random_initial(disc)
     simulated_image = hiprmc.rmc(disc, T, initial=initial)
