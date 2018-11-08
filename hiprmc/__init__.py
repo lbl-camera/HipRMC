@@ -51,31 +51,30 @@ def random_initial(image:np.array):
     initial2[: np.count_nonzero(image == 1)] = 1
     np.random.shuffle(initial2)
     initial = initial2.reshape(image.shape)
-    # initial_size = int(len(image) / 4)
-    # initial = np.zeros((initial_size, initial_size))
-    # initial2 = initial.reshape(mul(*initial.shape))
-    # initial2[: int(load*initial_size**2)] = 1
-    # np.random.shuffle(initial2)
-    # initial = initial2.reshape(initial.shape)
     return initial
 
 
-def rmc(image: np.array, T_MAX, N, initial: np.array = None):
+def rmc(image: np.array, T_MAX, N, mode, initial: np.array = None):
+    # uncomment the below two lines if using temperature tuning
     # simulated_image, t_max, t_min = hiprmc.temp_tuning(image, T_MAX, N, initial = initial)
     # T = t_max
+
     if initial is None:
         initial = hiprmc.random_initial(image)
 
+    # comment the three lines below if using using temperature tuning
     simulated_image = initial.copy()
     t_min = 0.0001
+    T = T_MAX
+
     iterations = 1000
     t_step = np.exp((np.log(t_min) - np.log(T_MAX)) / iterations)
 
-    F_image = hiprmc.fourier_transform(image)
+    if mode == 'simulated_data':
+        F_image = hiprmc.fourier_transform(image)
+
     F_old = hiprmc.fourier_transform(simulated_image)
     chi_old = hiprmc.chi_square(F_old, F_image)
-
-    T = T_MAX
 
     accept_rate, temperature, error, iteration = [], [], [], []
     move_distance = int(N / 2)
@@ -131,17 +130,17 @@ def rmc(image: np.array, T_MAX, N, initial: np.array = None):
         # if move_distance > N/2:
         #     move_distance = N/2
 
-    plt.figure()
-    plt.subplot(1, 2, 1)
-    plt.plot(temperature, accept_rate, 'bo')
-    plt.ylim([0, 1])
-    plt.ylabel('Acceptance Rate')
-    plt.xlabel('Temperature')
-    plt.subplot(1, 2, 2)
-    plt.plot(iteration, error, 'k-')
-    plt.ylabel('Chi-Squared Error')
-    plt.xlabel('Monte Carlo Iteration')
-    plt.tight_layout()
-    plt.show()
+    # plt.figure()
+    # plt.subplot(1, 2, 1)
+    # plt.plot(temperature, accept_rate, 'bo')
+    # plt.ylim([0, 1])
+    # plt.ylabel('Acceptance Rate')
+    # plt.xlabel('Temperature')
+    # plt.subplot(1, 2, 2)
+    # plt.plot(iteration, error, 'k-')
+    # plt.ylabel('Chi-Squared Error')
+    # plt.xlabel('Monte Carlo Iteration')
+    # plt.tight_layout()
+    # plt.show()
 
     return simulated_image
