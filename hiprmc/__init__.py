@@ -1,5 +1,6 @@
 import numpy as np
-from scipy import fftpack, optimize
+from scipy import fftpack
+from scipy.linalg import dft
 from operator import mul
 from hiprmc.temperature_tuning import temp_tuning
 import hiprmc
@@ -12,14 +13,14 @@ def fourier_transform(m):
 def chi_square(ft_simulation, ft_image):
     return np.sum((np.square(abs(abs(ft_simulation) ** 2 - abs(ft_image) ** 2)) / np.linalg.norm(ft_image) ** 2))
 
-# def DFT_Matrix(x_old, y_old, x_new, y_new, F_old, simulated_image):
-#     before_row, before_column = F_old[x_old, :], F_old[:, y_old]
-#     F_s = fourier_transform(simulated_image)
-#     after_row, after_column = F_s[x_new, :], F_s[:, y_new]
-#     U_new = np.outer(after_column, after_row)
-#     U_old = np.outer(before_column, before_row)
-#     U = U_new - U_old
-#     return U
+def DFT_Matrix(x_old, y_old, x_new, y_new, N):
+    m = dft(N)
+    before_row, before_column = m[x_old, :], m[:, y_old]
+    after_row, after_column = m[x_new, :], m[:, y_new]
+    U_new = np.outer(after_column, after_row)
+    U_old = np.outer(before_column, before_row)
+    U = U_new - U_old
+    return U
 
 def Metropolis(x_old, y_old, x_new, y_new, old_point, new_point, delta_chi, simulated_image, T, acceptance, chi_old,
                chi_new, T_MAX, iter, N, t_step):
@@ -107,7 +108,7 @@ def rmc(image: np.array, T_MAX, N, mode, initial: np.array = None):
             old_array[x_old][y_old] = 1
             new_array = np.zeros_like(image)
             new_array[x_new][y_new] = 1
-            F_new = F_old - hiprmc.fourier_transform(old_array) + hiprmc.fourier_transform(new_array)
+            F_new = F_old + DFT_Matrix(x_old, y_old, x_new, y_new, N)
             chi_new = hiprmc.chi_square(F_new, F_image)
             delta_chi = chi_new - chi_old
             acceptance, chi_old = hiprmc.Metropolis(x_old, y_old, x_new, y_new, old_point, new_point, delta_chi,
