@@ -17,8 +17,8 @@ def DFT_Matrix(x_old, y_old, x_new, y_new, N):
     m = dft(N)
     before_row, before_column = m[x_old, :], m[:, y_old]
     after_row, after_column = m[x_new, :], m[:, y_new]
-    U_new = np.outer(after_column, after_row)
-    U_old = np.outer(before_column, before_row)
+    U_new = np.outer(after_row, after_column)
+    U_old = np.outer(before_row, before_column)
     U = U_new - U_old
     return U
 
@@ -55,7 +55,7 @@ def random_initial(image:np.array):
     return initial
 
 
-def rmc(image: np.array, T_MAX, N, mode, initial: np.array = None):
+def rmc(image: np.array, T_MAX, N, iterations, initial: np.array = None):
     # uncomment the below two lines if using temperature tuning
     # simulated_image, t_max, t_min = hiprmc.temp_tuning(image, T_MAX, N, initial = initial)
     # T = t_max
@@ -68,17 +68,22 @@ def rmc(image: np.array, T_MAX, N, mode, initial: np.array = None):
     t_min = 0.0001
     T = T_MAX
 
-    iterations = 1000
+    iterations = 2000
     t_step = np.exp((np.log(t_min) - np.log(T_MAX)) / iterations)
 
-    if mode == 'simulated_data':
-        F_image = hiprmc.fourier_transform(image)
-
+    F_image = hiprmc.fourier_transform(image)
     F_old = hiprmc.fourier_transform(simulated_image)
     chi_old = hiprmc.chi_square(F_old, F_image)
 
     accept_rate, temperature, error, iteration = [], [], [], []
     move_distance = int(N / 2)
+
+
+    particle_list = []
+    for i in range(0, np.count_nonzero(simulated_image == 1)):
+        unfolded_simulated_image = simulated_image.reshape(mul(*simulated_image.shape))
+        if unfolded_simulated_image[i]
+        particle_list.append()
 
     for t in progressbar.progressbar(range(0, iterations)):
         move_count = 0.0

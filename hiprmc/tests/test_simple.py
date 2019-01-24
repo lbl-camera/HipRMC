@@ -5,8 +5,9 @@ from skimage.draw import polygon, circle
 from PIL import Image
 
 def test_simple():
-    N = 100  # size of image (NxN)
+    N = 20  # size of image (NxN)
     initial_image = np.zeros((N, N))
+    iterations = 2000
 
     # This bit creates a disc to try and model via RMC
     # for i in range(0, N):
@@ -30,14 +31,11 @@ def test_simple():
     # set load of particles
     # load = 0.05 * N * N
 
-    # declare whether data is simulated or real
-    mode = 'simulated_data'
-
     T = N  # temperature is on the same order as the image
     T_MAX = T
 
     initial = hiprmc.random_initial(initial_image)
-    simulated_image = hiprmc.rmc(initial_image, T_MAX, N, mode, initial=initial)
+    simulated_image = hiprmc.rmc(initial_image, T_MAX, N, iterations, initial=initial)
 
     f = plt.figure()
     f.add_subplot(1, 5, 1)
