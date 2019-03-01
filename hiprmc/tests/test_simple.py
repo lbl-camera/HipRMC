@@ -8,7 +8,7 @@ from PIL import Image
 def test_simple():
     #N = 60  # size of image (NxN)
     #initial_image = np.zeros((N, N))
-    iterations = 1000
+    iterations = 10
 
     # This bit creates a disc to try and model via RMC
     #for i in range(0, N):
@@ -27,8 +27,8 @@ def test_simple():
     #initial_image[int(2*N/6):int(4*N/6), int(1*N/6):int(5*N/6)] = 0
 
     # Image upload
-    f_image = np.load('/home/nathan/shuai_data_cropped/cool_40p0C_ILC1_insitu_40pt0C_2m.edf.npy')
-    f_mask = np.load('/home/nathan/shuai_data_cropped/shuai_data_mask.edf.npy')
+    f_image = np.load('/home/rp/Downloads/cool_40p0C_ILC1_insitu_40pt0C_2m.edf.npy')
+    f_mask = np.load('/home/rp/Downloads/shuai_data_mask.edf.npy')
     N = f_image.shape[0]
     #f_image[f_image==np.nan]=0
     #plt.imshow(np.log10(f_image), origin='lower', cmap='Greys')
@@ -53,29 +53,29 @@ def test_simple():
     #f_image = np.fft.fft2(initial_image)
     simulated_image, initial_cropped_image, mask = hiprmc.rmc(f_image, f_mask, T_MAX, iterations, load, random_start=random_start)
 
-    f = plt.figure()
-    f.add_subplot(1, 5, 1)
-    plt.imshow(np.log10(f_image), cmap='Greys', origin="lower")
-    plt.axis('off')
-    plt.title("original image")
-    #f.add_subplot(1, 5, 2)
-    #plt.imshow(np.log10(f_image), cmap='Greys', origin="lower")
-    #plt.axis('off')
-    #lt.title("Initial Intensity Plot")
-    f.add_subplot(1, 5, 2)
-    plt.imshow(np.log10(initial_cropped_image), origin="lower", cmap='Greys')
-    #plt.imshow(mask, cmap='Greys',origin='lower', alpha=0.5)
-    plt.axis('off')
-    plt.title("Initial (Cropped) Intensity Plot")
-    f.add_subplot(1, 5, 3)
-    plt.imshow(simulated_image, cmap="Greys", origin="lower")
-    plt.title("Model")
-    plt.axis('off')
-    f.add_subplot(1, 5, 4)
-    plt.imshow(np.log10(abs(hiprmc.fourier_transform(simulated_image))**2), origin='lower', cmap='Greys')
-    plt.axis('off')
-    plt.title("Model Intensity Plot")
-    plt.show()
+    # f = plt.figure()
+    # f.add_subplot(1, 5, 1)
+    # plt.imshow(np.log10(f_image), cmap='Greys', origin="lower")
+    # plt.axis('off')
+    # plt.title("original image")
+    # #f.add_subplot(1, 5, 2)
+    # #plt.imshow(np.log10(f_image), cmap='Greys', origin="lower")
+    # #plt.axis('off')
+    # #lt.title("Initial Intensity Plot")
+    # f.add_subplot(1, 5, 2)
+    # plt.imshow(np.log10(initial_cropped_image), origin="lower", cmap='Greys')
+    # #plt.imshow(mask, cmap='Greys',origin='lower', alpha=0.5)
+    # plt.axis('off')
+    # plt.title("Initial (Cropped) Intensity Plot")
+    # f.add_subplot(1, 5, 3)
+    # plt.imshow(simulated_image, cmap="Greys", origin="lower")
+    # plt.title("Model")
+    # plt.axis('off')
+    # f.add_subplot(1, 5, 4)
+    # plt.imshow(np.log10(abs(hiprmc.fourier_transform(simulated_image))**2), origin='lower', cmap='Greys')
+    # plt.axis('off')
+    # plt.title("Model Intensity Plot")
+    # plt.show()
 
 
 if __name__ == '__main__':

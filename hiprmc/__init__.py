@@ -1,24 +1,26 @@
 import numpy as np
 from scipy.linalg import dft
 from operator import mul
-from hiprmc.temperature_tuning import temp_tuning
-import hiprmc
+from .temperature_tuning import temp_tuning
 import progressbar
-import matplotlib.pyplot as plt
-import multiprocessing
+from numpy.fft import fft2 as fourier_transform
+from functools import lru_cache
+import numba
 
+@numba.vectorize([numba.float64(numba.complex128),numba.float32(numba.complex64)])
+def abs2(x):
+    return x.real**2 + x.imag**2
 
-def fourier_transform(m):
-    m_fft = np.fft.fft2(m)
-    return m_fft
-
-
+@numba.jit(nopython=True)
 def chi_square(i_simulation, i_image, norm, mask):
-    return np.sum(np.multiply(np.square(abs(i_simulation - i_image)) / norm, mask))
+    return np.sum(abs2(i_simulation - i_image) / norm * mask)
 
+@lru_cache(1)
+def memoized_dft(N):
+    return dft(N)
 
 def DFT_Matrix(x_old, y_old, x_new, y_new, N):
-    m = dft(N)
+    m = memoized_dft(N)
     before_row, before_column = m[x_old, :], m[:, y_old]
     after_row, after_column = m[x_new, :], m[:, y_new]
     U_new = np.outer(after_row, after_column)
@@ -96,6 +98,8 @@ def rmc(image: np.array, mask: np.array, T_MAX, iterations, load, random_start: 
     # simulated_image, t_max, t_min = hiprmc.temp_tuning(image, T_MAX, N, initial = initial)
     # T = t_max
 
+    mask=mask.astype(np.bool_)
+
     # comment the three lines below if using using temperature tuning
     t_min = 0.0001
     T = T_MAX
@@ -106,22 +110,22 @@ def rmc(image: np.array, mask: np.array, T_MAX, iterations, load, random_start: 
     accept_rate, temperature, error, iteration = [], [], [], []
     N = 80
     initial_crop = crop_center(image, N, N)
-    mask = 1 - mask
+    mask = np.logical_not(mask)
     mask = crop_center(mask, N, N)
 
     random_start_small = random_initial_crop(initial_crop, load)
-    F_old = hiprmc.fourier_transform(random_start_small)
+    F_old = fourier_transform(random_start_small)
 
     if random_start is None:
-        random_start = hiprmc.random_initial(image)
+        random_start = random_initial(image)
 
     simulated_image = np.real(random_start_small)
 
-    i_simulation = abs(F_old) ** 2
+    i_simulation = abs2(F_old)
     i_image = initial_crop
     norm = np.linalg.norm(i_image) ** 2
 
-    chi_old = hiprmc.chi_square(i_simulation, i_image, norm, mask)
+    chi_old = chi_square(i_simulation, i_image, norm, mask)
 
     particle_list = list(zip(*np.nonzero(simulated_image)))
 
@@ -145,14 +149,14 @@ def rmc(image: np.array, mask: np.array, T_MAX, iterations, load, random_start: 
             simulated_image[x_old][y_old] = new_point
             simulated_image[x_new][y_new] = old_point
             F_new = F_old + DFT_Matrix(x_old, y_old, x_new, y_new, initial_crop.shape[0])
-            i_simulation = abs(F_new) ** 2
-            chi_new = hiprmc.chi_square(i_simulation, i_image, norm, mask)
+            i_simulation = abs2(F_new)
+            chi_new = chi_square(i_simulation, i_image, norm, mask)
             delta_chi = chi_new - chi_old
-            acceptance, chi_old = hiprmc.Metropolis(x_old, y_old, x_new, y_new, old_point, new_point, delta_chi,
+            acceptance, chi_old = Metropolis(x_old, y_old, x_new, y_new, old_point, new_point, delta_chi,
                                                     simulated_image, T, acceptance, chi_old, chi_new, T_MAX,
                                                     particle_number, N,
                                                     t_step)
-            F_old = hiprmc.fourier_transform(simulated_image)
+            F_old = F_new
 
         particle_list = list(zip(*np.nonzero(simulated_image)))
 
