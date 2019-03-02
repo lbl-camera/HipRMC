@@ -109,7 +109,6 @@ def rmc(image: np.array, T_MAX, N, iterations):
             y_old = particle_list[particle_number][1]
             x_new = np.random.randint(0, image.shape[0])
             y_new = np.random.randint(0, image.shape[1])
-            move_distance = int(N / 2)
             old_point = new_point = simulated_image[x_old][y_old]
             while new_point == old_point:
                 x_new, y_new = random_from_circle(move_distance, x_old, y_old)
