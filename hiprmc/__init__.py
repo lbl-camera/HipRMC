@@ -20,9 +20,6 @@ def abs2(x):
 def chi_square(i_simulation, i_image, norm):
     return np.sum(abs2(i_image - i_simulation) / norm)
 
-#def chi_square(i_simulation, i_image, norm):
-#    return np.sum((np.square(abs(i_simulation - i_image)) / norm))
-
 @lru_cache(1)
 def memoized_dft(N):
     return dft(N)

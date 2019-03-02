@@ -6,9 +6,9 @@ from skimage.draw import polygon, circle
 from PIL import Image
 
 def test_simple():
-    N = 40  # size of image (NxN)
+    N = 20  # size of image (NxN)
     initial_image = np.zeros((N, N))
-    iterations = 1000
+    iterations = 2000
 
     # This bit creates a disc to try and model via RMC
     # for i in range(0, N):
