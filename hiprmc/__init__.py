@@ -6,6 +6,7 @@ import progressbar
 from numpy.fft import fft2 as fourier_transform
 from functools import lru_cache
 import numba
+import matplotlib.pyplot as plt
 
 @numba.vectorize([numba.float64(numba.complex128),numba.float32(numba.complex64)])
 def abs2(x):
@@ -13,7 +14,7 @@ def abs2(x):
 
 @numba.jit(nopython=True)
 def chi_square(i_simulation, i_image, norm, mask):
-    return np.sum(abs2(i_simulation - i_image) / norm * mask)
+    return np.sum(abs2(i_simulation - i_image) / norm)
 
 @lru_cache(1)
 def memoized_dft(N):
@@ -93,7 +94,7 @@ def crop_center(img, cropx, cropy):
     return img[starty:starty + cropy, startx:startx + cropx]
 
 
-def rmc(image: np.array, mask: np.array, T_MAX, iterations, load, random_start: np.array = None):
+def rmc(image: np.array, mask: np.array, N, T_MAX, iterations, load, random_start: np.array = None):
     # uncomment the below two lines if using temperature tuning
     # simulated_image, t_max, t_min = hiprmc.temp_tuning(image, T_MAX, N, initial = initial)
     # T = t_max
@@ -108,12 +109,13 @@ def rmc(image: np.array, mask: np.array, T_MAX, iterations, load, random_start: 
     t_step = np.exp((np.log(t_min) - np.log(T_MAX)) / iterations)
 
     accept_rate, temperature, error, iteration = [], [], [], []
-    N = 80
-    initial_crop = crop_center(image, N, N)
-    mask = np.logical_not(mask)
-    mask = crop_center(mask, N, N)
-
-    random_start_small = random_initial_crop(initial_crop, load)
+    # N = 80
+    # initial_crop = crop_center(image, N, N)
+    initial_crop = image
+    # mask = np.logical_not(mask)
+    # mask = crop_center(mask, N, N)
+    #
+    random_start_small = random_initial(image)
     F_old = fourier_transform(random_start_small)
 
     if random_start is None:
@@ -122,8 +124,8 @@ def rmc(image: np.array, mask: np.array, T_MAX, iterations, load, random_start: 
     simulated_image = np.real(random_start_small)
 
     i_simulation = abs2(F_old)
-    i_image = initial_crop
-    norm = np.linalg.norm(i_image) ** 2
+    i_image = abs2(fourier_transform(image))
+    norm = np.linalg.norm(i_image)**2
 
     chi_old = chi_square(i_simulation, i_image, norm, mask)
 
@@ -152,6 +154,7 @@ def rmc(image: np.array, mask: np.array, T_MAX, iterations, load, random_start: 
             i_simulation = abs2(F_new)
             chi_new = chi_square(i_simulation, i_image, norm, mask)
             delta_chi = chi_new - chi_old
+            print(delta_chi)
             acceptance, chi_old = Metropolis(x_old, y_old, x_new, y_new, old_point, new_point, delta_chi,
                                                     simulated_image, T, acceptance, chi_old, chi_new, T_MAX,
                                                     particle_number, N,
@@ -165,5 +168,8 @@ def rmc(image: np.array, mask: np.array, T_MAX, iterations, load, random_start: 
         temperature.append(T)
         error.append(chi_old)
         iteration.append(t)
+
+    plt.plot(iteration, error)
+    plt.show()
 
     return simulated_image, initial_crop, mask
