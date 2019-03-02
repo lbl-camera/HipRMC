@@ -33,10 +33,7 @@ def DFT_Matrix(x_old, y_old, x_new, y_new, N):
 
 def Metropolis(x_old, y_old, x_new, y_new, old_point, new_point, delta_chi, simulated_image, T, acceptance, chi_old,
                chi_new, T_MAX, iter, N, t_step):
-    if T <= 0:
-        simulated_image[x_old][y_old] = old_point
-        simulated_image[x_new][y_new] = new_point
-    else:
+    if T > 0:
         if delta_chi < 0:
             simulated_image[x_old][y_old] = new_point
             simulated_image[x_new][y_new] = old_point
@@ -50,9 +47,6 @@ def Metropolis(x_old, y_old, x_new, y_new, old_point, new_point, delta_chi, simu
                 simulated_image[x_new][y_new] = old_point
                 acceptance += 1.0
                 chi_old = chi_new
-            else:
-                simulated_image[x_old][y_old] = old_point
-                simulated_image[x_new][y_new] = new_point
     return acceptance, chi_old
 
 def random_from_circle(radius, centerX, centerY):
@@ -121,8 +115,6 @@ def rmc(image: np.array, T_MAX, N, iterations):
                 x_new, y_new = random_from_circle(move_distance, x_old, y_old)
                 x_new, y_new = periodic(image, x_new, y_new)
                 new_point = simulated_image[x_new][y_new]
-            simulated_image[x_old][y_old] = new_point
-            simulated_image[x_new][y_new] = old_point
             f_new = f_old + DFT_Matrix(x_old, y_old, x_new, y_new, N)
             i_simulation = abs2(f_new)
             chi_new = chi_square(i_simulation, i_image, norm)
