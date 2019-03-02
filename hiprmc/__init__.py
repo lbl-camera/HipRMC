@@ -3,9 +3,7 @@ from scipy import fftpack
 from scipy.linalg import dft
 from operator import mul
 from hiprmc.temperature_tuning import temp_tuning
-import hiprmc
 import progressbar
-import matplotlib.pyplot as plt
 from functools import lru_cache
 import numba
 
@@ -85,7 +83,7 @@ def rmc(image: np.array, T_MAX, N, iterations):
     # T = t_max
 
    # if initial is None:
-    initial = hiprmc.random_initial(image)
+    initial = random_initial(image)
 
     # comment the three lines below if using using temperature tuning
     simulated_image = initial.copy()
@@ -95,12 +93,12 @@ def rmc(image: np.array, T_MAX, N, iterations):
     iterations = iterations
     t_step = np.exp((np.log(t_min) - np.log(T_MAX)) / iterations)
 
-    f_image = hiprmc.fourier_transform(image)
-    f_old = hiprmc.fourier_transform(simulated_image)
+    f_image = fourier_transform(image)
+    f_old = fourier_transform(simulated_image)
     i_image = abs2(f_image)
     i_simulation = abs2(f_old)
     norm = np.linalg.norm(f_image) ** 2
-    chi_old = hiprmc.chi_square(i_simulation, i_image, norm)
+    chi_old = chi_square(i_simulation, i_image, norm)
 
     accept_rate, temperature, error, iteration = [], [], [], []
     move_distance = int(N / 2)
@@ -127,12 +125,12 @@ def rmc(image: np.array, T_MAX, N, iterations):
             simulated_image[x_new][y_new] = old_point
             f_new = f_old + DFT_Matrix(x_old, y_old, x_new, y_new, N)
             i_simulation = abs2(f_new)
-            chi_new = hiprmc.chi_square(i_simulation, i_image, norm)
+            chi_new = chi_square(i_simulation, i_image, norm)
             delta_chi = chi_new - chi_old
-            acceptance, chi_old = hiprmc.Metropolis(x_old, y_old, x_new, y_new, old_point, new_point, delta_chi,
+            acceptance, chi_old = Metropolis(x_old, y_old, x_new, y_new, old_point, new_point, delta_chi,
                                                     simulated_image, T, acceptance, chi_old, chi_new, T_MAX, iter, N,
                                                     t_step)
-            f_old = hiprmc.fourier_transform(simulated_image)
+            f_old = fourier_transform(simulated_image)
 
         particle_list = list(zip(*np.nonzero(simulated_image)))
 
@@ -141,27 +139,5 @@ def rmc(image: np.array, T_MAX, N, iterations):
         temperature.append(T)
         error.append(chi_old)
         iteration.append(t)
-
-        # if acceptance_rate > 0.5:
-        #     move_distance = move_distance - 1
-        # if move_distance <= 0:
-        #     move_distance = 1
-        # if acceptance_rate < 0.3:
-        #     move_distance = move_distance + 1
-        # if move_distance > N/2:
-        #     move_distance = N/2
-
-    # plt.figure()
-    # plt.subplot(1, 2, 1)
-    # plt.plot(temperature, accept_rate, 'bo')
-    # plt.ylim([0, 1])
-    # plt.ylabel('Acceptance Rate')
-    # plt.xlabel('Temperature')
-    # plt.subplot(1, 2, 2)
-    # plt.plot(iteration, error, 'k-')
-    # plt.ylabel('Chi-Squared Error')
-    # plt.xlabel('Monte Carlo Iteration')
-    # plt.tight_layout()
-    # plt.show()
 
     return simulated_image
