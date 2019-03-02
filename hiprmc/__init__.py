@@ -14,7 +14,7 @@ def abs2(x):
 
 @numba.jit(nopython=True)
 def chi_square(i_simulation, i_image, norm, mask):
-    return np.sum(abs2(i_simulation - i_image) / norm)
+    return np.sum(abs2(i_image - i_simulation) / norm)
 
 @lru_cache(1)
 def memoized_dft(N):
@@ -123,7 +123,7 @@ def rmc(image: np.array, mask: np.array, N, T_MAX, iterations, load, random_star
 
     simulated_image = np.real(random_start_small)
 
-    i_simulation = abs2(F_old)
+    i_simulation = abs2(fourier_transform(simulated_image))
     i_image = abs2(fourier_transform(image))
     norm = np.linalg.norm(i_image)**2
 
@@ -154,7 +154,6 @@ def rmc(image: np.array, mask: np.array, N, T_MAX, iterations, load, random_star
             i_simulation = abs2(F_new)
             chi_new = chi_square(i_simulation, i_image, norm, mask)
             delta_chi = chi_new - chi_old
-            print(delta_chi)
             acceptance, chi_old = Metropolis(x_old, y_old, x_new, y_new, old_point, new_point, delta_chi,
                                                     simulated_image, T, acceptance, chi_old, chi_new, T_MAX,
                                                     particle_number, N,
@@ -170,6 +169,8 @@ def rmc(image: np.array, mask: np.array, N, T_MAX, iterations, load, random_star
         iteration.append(t)
 
     plt.plot(iteration, error)
+    plt.ylabel('Chi Square')
+    plt.xlabel('Monte Carlo Iteration')
     plt.show()
 
     return simulated_image, initial_crop, mask
