@@ -11,17 +11,17 @@ def test_simple():
     iterations = 1000
 
     # This bit creates a disc to try and model via RMC
-    for i in range(0, N):
-         for j in range(0, N):
-             r = np.sqrt((i - int(N / 2)) ** 2 + (j - int(N / 2)) ** 2)
-             if r >= 10 and r <= 15:
-                 initial_image[i, j] = 1
-             else:
-                initial_image[i, j] = 0
+    # for i in range(0, N):
+    #      for j in range(0, N):
+    #          r = np.sqrt((i - int(N / 2)) ** 2 + (j - int(N / 2)) ** 2)
+    #          if r >= 60 and r <= 61:
+    #              initial_image[i, j] = 1
+    #          else:
+    #             initial_image[i, j] = 0
 
     # This creates a circle to model via RMC
-    #rr, cc = circle(int(N/4), int(N/4), int(N/8))
-    #initial_image[rr, cc] = 1
+    rr, cc = circle(int(N/4), int(N/4), int(N/8))
+    initial_image[rr, cc] = 1
 
     # This creates a square
     #initial_image[int(2*N/6):int(4*N/6), int(1*N/6):int(5*N/6)] = 0
@@ -30,7 +30,7 @@ def test_simple():
 
     # Image upload
     #f_image = np.load('/home/rp/Downloads/cool_40p0C_ILC1_insitu_40pt0C_2m.edf.npy')
-    f_mask = np.load('/home/nathan/shuai_processed_data/shuai_data_mask.edf.npy')
+    #f_mask = np.load('/home/nathan/shuai_processed_data/shuai_data_mask.edf.npy')
     #N = f_image.shape[0]
     #f_image[f_image==np.nan]=0
     #plt.imshow(np.log10(f_image), origin='lower', cmap='Greys')
@@ -53,7 +53,7 @@ def test_simple():
     np.random.shuffle(initial2)
     random_start = initial2.reshape(f_image.shape)
     #f_image = np.fft.fft2(initial_image)
-    simulated_image, initial_cropped_image, mask = hiprmc.rmc(f_image, f_mask, N, T_MAX, iterations, load, random_start=random_start)
+    simulated_image = hiprmc.rmc(f_image, N, T_MAX, iterations)
 
     f = plt.figure()
     f.add_subplot(1, 5, 1)
