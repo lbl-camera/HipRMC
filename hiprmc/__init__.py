@@ -3,9 +3,7 @@ from scipy import fftpack
 from scipy.linalg import dft
 from operator import mul
 from hiprmc.temperature_tuning import temp_tuning
-import hiprmc
 import progressbar
-import matplotlib.pyplot as plt
 from functools import lru_cache
 import numba
 
@@ -18,7 +16,7 @@ def abs2(x):
 
 @numba.jit(nopython=True)
 def chi_square(i_simulation, i_image, norm):
-    return np.sum(abs2(i_image - i_simulation) / norm)
+    return np.sum((abs2(i_image - i_simulation) / norm))
 
 @lru_cache(1)
 def memoized_dft(N):
@@ -35,26 +33,19 @@ def DFT_Matrix(x_old, y_old, x_new, y_new, N):
 
 def Metropolis(x_old, y_old, x_new, y_new, old_point, new_point, delta_chi, simulated_image, T, acceptance, chi_old,
                chi_new, T_MAX, iter, N, t_step):
-    if T <= 0:
-        simulated_image[x_old][y_old] = old_point
-        simulated_image[x_new][y_new] = new_point
-    else:
+    if T > 0:
         if delta_chi < 0:
             simulated_image[x_old][y_old] = new_point
             simulated_image[x_new][y_new] = old_point
             acceptance += 1.0
             chi_old = chi_new
         else:
-            #temperature  = T / (T_MAX - T)
             b = np.exp(-delta_chi / T)
             if b > np.random.rand():
                 simulated_image[x_old][y_old] = new_point
                 simulated_image[x_new][y_new] = old_point
                 acceptance += 1.0
                 chi_old = chi_new
-            else:
-                simulated_image[x_old][y_old] = old_point
-                simulated_image[x_new][y_new] = new_point
     return acceptance, chi_old
 
 def random_from_circle(radius, centerX, centerY):
@@ -79,28 +70,34 @@ def random_initial(image:np.array):
     return initial
 
 
-def rmc(image: np.array, T_MAX, N, iterations):
-    # uncomment the below two lines if using temperature tuning
-    # simulated_image, t_max, t_min = hiprmc.temp_tuning(image, T_MAX, N, initial = initial)
-    # T = t_max
+def rmc(image: np.array, N, T_MAX, iterations):
 
-   # if initial is None:
-    initial = hiprmc.random_initial(image)
+    ##########################################################
+    ##### Temp Tuning:  Uncomment for Tuning ##################
+    ##########################################################
+    #simulated_image = random_initial(image)
+    #t_max, t_min = temp_tuning(image, simulated_image, T_MAX, N)
+    #T = t_max
 
-    # comment the three lines below if using using temperature tuning
-    simulated_image = initial.copy()
+    ##########################################################
+    ##### Temp Tuning:  comment for Tuning ###################
+    ##########################################################
+    simulated_image = random_initial(image)
     t_min = 0.0001
     T = T_MAX
-
     iterations = iterations
-    t_step = np.exp((np.log(t_min) - np.log(T_MAX)) / iterations)
 
-    f_image = hiprmc.fourier_transform(image)
-    f_old = hiprmc.fourier_transform(simulated_image)
-    i_image = abs2(f_image)
+    ##########################################################
+    ######### End Temp Tuning Indents ########################
+    ##########################################################
+
+    t_step = np.exp((np.log(t_min) - np.log(T_MAX)) / iterations)   # exponential cooling rate
+
+    f_old = fourier_transform(simulated_image)
+    i_image = image
     i_simulation = abs2(f_old)
-    norm = np.linalg.norm(f_image) ** 2
-    chi_old = hiprmc.chi_square(i_simulation, i_image, norm)
+    norm = np.linalg.norm(image)**2   ########change what you take the norm of, f_image or i_image
+    chi_old = chi_square(i_simulation, i_image, norm)
 
     accept_rate, temperature, error, iteration = [], [], [], []
     move_distance = int(N / 2)
@@ -117,22 +114,19 @@ def rmc(image: np.array, T_MAX, N, iterations):
             y_old = particle_list[particle_number][1]
             x_new = np.random.randint(0, image.shape[0])
             y_new = np.random.randint(0, image.shape[1])
-            move_distance = int(N / 2)
             old_point = new_point = simulated_image[x_old][y_old]
             while new_point == old_point:
                 x_new, y_new = random_from_circle(move_distance, x_old, y_old)
                 x_new, y_new = periodic(image, x_new, y_new)
                 new_point = simulated_image[x_new][y_new]
-            simulated_image[x_old][y_old] = new_point
-            simulated_image[x_new][y_new] = old_point
             f_new = f_old + DFT_Matrix(x_old, y_old, x_new, y_new, N)
             i_simulation = abs2(f_new)
-            chi_new = hiprmc.chi_square(i_simulation, i_image, norm)
+            chi_new = chi_square(i_simulation, i_image, norm)
             delta_chi = chi_new - chi_old
-            acceptance, chi_old = hiprmc.Metropolis(x_old, y_old, x_new, y_new, old_point, new_point, delta_chi,
+            acceptance, chi_old = Metropolis(x_old, y_old, x_new, y_new, old_point, new_point, delta_chi,
                                                     simulated_image, T, acceptance, chi_old, chi_new, T_MAX, iter, N,
                                                     t_step)
-            f_old = hiprmc.fourier_transform(simulated_image)
+            f_old = fourier_transform(simulated_image)
 
         particle_list = list(zip(*np.nonzero(simulated_image)))
 
@@ -141,27 +135,5 @@ def rmc(image: np.array, T_MAX, N, iterations):
         temperature.append(T)
         error.append(chi_old)
         iteration.append(t)
-
-        # if acceptance_rate > 0.5:
-        #     move_distance = move_distance - 1
-        # if move_distance <= 0:
-        #     move_distance = 1
-        # if acceptance_rate < 0.3:
-        #     move_distance = move_distance + 1
-        # if move_distance > N/2:
-        #     move_distance = N/2
-
-    # plt.figure()
-    # plt.subplot(1, 2, 1)
-    # plt.plot(temperature, accept_rate, 'bo')
-    # plt.ylim([0, 1])
-    # plt.ylabel('Acceptance Rate')
-    # plt.xlabel('Temperature')
-    # plt.subplot(1, 2, 2)
-    # plt.plot(iteration, error, 'k-')
-    # plt.ylabel('Chi-Squared Error')
-    # plt.xlabel('Monte Carlo Iteration')
-    # plt.tight_layout()
-    # plt.show()
 
     return simulated_image

@@ -5,15 +5,18 @@ import matplotlib.pyplot as plt
 import hiprmc
 
 
-def temp_tuning(image: np.array, T_MAX, N, initial: np.array = None):
-    if initial is None:
-        initial = hiprmc.random_initial(image)
+def temp_tuning(image: np.array, T_MAX, N, norm):
+    #if initial is None:
+    initial = hiprmc.random_initial(image)
     T = T_MAX
     # T = 0
     simulated_image = initial.copy()
     original = simulated_image
     F_image = hiprmc.fourier_transform(image)
     F_old = hiprmc.fourier_transform(simulated_image)
+    i_image = hiprmc.abs2(f_image)
+    i_simulation = hiprmc.abs2(f_old)
+    norm = np.linalg.norm(f_image) ** 2
     chi_old = hiprmc.chi_square(F_old, F_image)
     error, count, accept_rate, temperature = [], [], [], []
     t_step = T_MAX / 100.0
