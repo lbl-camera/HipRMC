@@ -6,6 +6,8 @@ from hiprmc.temperature_tuning import temp_tuning
 import progressbar
 from functools import lru_cache
 import numba
+import matplotlib.pyplot as plt
+from matplotlib import animation
 
 def fourier_transform(m):
     return fftpack.fft2(m)
@@ -61,16 +63,16 @@ def periodic(img, x, y):
     y = y % img.shape[1]
     return x, y
 
-def random_initial(image:np.array):
+def random_initial(image:np.array, num_particles):
     initial = np.zeros_like(image)
     initial2 = initial.reshape(mul(*image.shape))
-    initial2[: np.count_nonzero(image == 1)] = 1
+    initial2[: num_particles] = 1
     np.random.shuffle(initial2)
     initial = initial2.reshape(image.shape)
     return initial
 
 
-def rmc(image: np.array, N, T_MAX, iterations):
+def rmc(image: np.array, num_particles, N, T_MAX, iterations, movie=False):
 
     ##########################################################
     ##### Temp Tuning:  Uncomment for Tuning ##################
@@ -82,8 +84,10 @@ def rmc(image: np.array, N, T_MAX, iterations):
     ##########################################################
     ##### Temp Tuning:  comment for Tuning ###################
     ##########################################################
-    simulated_image = random_initial(image)
-    t_min = 0.0001
+    simulated_image = random_initial(image, num_particles)
+    # plt.imshow(simulated_image)
+    # plt.show()
+    t_min = 0.00001
     T = T_MAX
     iterations = iterations
 
@@ -92,6 +96,12 @@ def rmc(image: np.array, N, T_MAX, iterations):
     ##########################################################
 
     t_step = np.exp((np.log(t_min) - np.log(T_MAX)) / iterations)   # exponential cooling rate
+
+    if movie:
+        import cv2
+        from cv2 import VideoWriter, VideoWriter_fourcc
+        fourcc = VideoWriter_fourcc(*'XVID')
+        video = VideoWriter('./test.avi', fourcc, float(60), image.shape)
 
     f_old = fourier_transform(simulated_image)
     i_image = image
@@ -130,10 +140,26 @@ def rmc(image: np.array, N, T_MAX, iterations):
 
         particle_list = list(zip(*np.nonzero(simulated_image)))
 
+        if movie:
+            frame = simulated_image.astype(np.uint8)*255
+            video.write(np.dstack([frame, frame, frame]))
+
+
+
         acceptance_rate = acceptance / move_count
         accept_rate.append(acceptance_rate)
         temperature.append(T)
         error.append(chi_old)
         iteration.append(t)
+    plt.figure(3)
+    plt.plot(np.log(temperature),accept_rate,'r-')
+    plt.title('Acceptance Rate')
+    plt.ylabel('Acceptance Rate')
+    plt.xlabel('ln(Temperature)')
+    plt.show()
+
+
+    if movie:
+        video.release()
 
     return simulated_image
