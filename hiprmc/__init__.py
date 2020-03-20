@@ -12,17 +12,25 @@ from matplotlib import animation
 def fourier_transform(m):
     return fftpack.fft2(m)
 
+@lru_cache(1)
+def memoized_dft(N):
+    return dft(N)
+
 @numba.vectorize([numba.float64(numba.complex128),numba.float32(numba.complex64)])
 def abs2(x):
     return x.real**2 + x.imag**2
 
-@numba.jit(nopython=True)
-def chi_square(i_simulation, i_image, norm):
-    return np.sum((abs2(i_image - i_simulation) / norm))
+@lru_cache(1)
+def q_scaling(shape):
+    return np.fromfunction(lambda i, j: ((i-shape[0]/2)**2+(i-shape[1])**2/2)**-.5, shape)
 
 @lru_cache(1)
-def memoized_dft(N):
-    return dft(N)
+def lin_scaling(shape):
+    return np.fromfunction(lambda i, j: 1 - 1/50. * ((i-shape[0]/2)**2+(i-shape[1])**2/2)**.5, shape)
+
+@numba.jit(nopython=True)
+def chi_square(i_simulation, i_image, norm):
+    return np.sum(abs2(i_image - i_simulation)) / norm
 
 def DFT_Matrix(x_old, y_old, x_new, y_new, N):
     m = memoized_dft(N)
@@ -63,45 +71,44 @@ def periodic(img, x, y):
     y = y % img.shape[1]
     return x, y
 
-def random_initial(image:np.array, num_particles):
+def random_initial(image:np.array, load):
     initial = np.zeros_like(image)
     initial2 = initial.reshape(mul(*image.shape))
-    initial2[: num_particles] = 1
+    initial2[: int(load*image.size)] = 1
     np.random.shuffle(initial2)
     initial = initial2.reshape(image.shape)
     return initial
 
 
-def rmc(image: np.array, num_particles, N, T_MAX, iterations, movie=False):
+def rmc(image: np.array, T_MAX, iterations, load, movie=False):
 
     ##########################################################
     ##### Temp Tuning:  Uncomment for Tuning ##################
     ##########################################################
-    #simulated_image = random_initial(image)
-    #t_max, t_min = temp_tuning(image, simulated_image, T_MAX, N)
-    #T = t_max
-
+    print('Performing Temperature Tuning')
+    simulated_image = random_initial(image, load)
+    t_max, t_min = temp_tuning(image, simulated_image, T_MAX)
+    T = t_max
+    print('Completed Temperature Tuning')
+    print(t_max,t_min)
     ##########################################################
     ##### Temp Tuning:  comment for Tuning ###################
     ##########################################################
-    simulated_image = random_initial(image, num_particles)
-    # plt.imshow(simulated_image)
-    # plt.show()
-    t_min = 0.00001
-    T = T_MAX
-    iterations = iterations
-
+    #simulated_image = random_initial(image, load)
+    #t_min = 0.00001
+    #T = T_MAX
     ##########################################################
     ######### End Temp Tuning Indents ########################
     ##########################################################
 
-    t_step = np.exp((np.log(t_min) - np.log(T_MAX)) / iterations)   # exponential cooling rate
-
-    if movie:
-        import cv2
-        from cv2 import VideoWriter, VideoWriter_fourcc
-        fourcc = VideoWriter_fourcc(*'XVID')
-        video = VideoWriter('./test.avi', fourcc, float(60), image.shape)
+    iterations = iterations
+    t_step = np.exp((np.log(t_min) - np.log(T)) / iterations)   # exponential cooling rate
+    #t_step = (T_MAX - t_min)/iterations                             # linear cooling rate
+    #if movie:
+    #    import cv2
+    #    from cv2 import VideoWriter, VideoWriter_fourcc
+    #    fourcc = VideoWriter_fourcc(*'XVID')
+    #    video = VideoWriter('./test.avi', fourcc, float(60), image.shape)
 
     f_old = fourier_transform(simulated_image)
     i_image = image
@@ -110,7 +117,7 @@ def rmc(image: np.array, num_particles, N, T_MAX, iterations, movie=False):
     chi_old = chi_square(i_simulation, i_image, norm)
 
     accept_rate, temperature, error, iteration = [], [], [], []
-    move_distance = int(N / 2)
+    move_distance = int(image.shape[0] / 2)
 
     particle_list = list(zip(*np.nonzero(simulated_image)))
 
@@ -129,20 +136,20 @@ def rmc(image: np.array, num_particles, N, T_MAX, iterations, movie=False):
                 x_new, y_new = random_from_circle(move_distance, x_old, y_old)
                 x_new, y_new = periodic(image, x_new, y_new)
                 new_point = simulated_image[x_new][y_new]
-            f_new = f_old + DFT_Matrix(x_old, y_old, x_new, y_new, N)
+            f_new = f_old + DFT_Matrix(x_old, y_old, x_new, y_new, image.shape[0])
             i_simulation = abs2(f_new)
             chi_new = chi_square(i_simulation, i_image, norm)
             delta_chi = chi_new - chi_old
             acceptance, chi_old = Metropolis(x_old, y_old, x_new, y_new, old_point, new_point, delta_chi,
-                                                    simulated_image, T, acceptance, chi_old, chi_new, T_MAX, iter, N,
+                                                    simulated_image, T, acceptance, chi_old, chi_new, T_MAX, iter, image.shape[0],
                                                     t_step)
             f_old = fourier_transform(simulated_image)
 
         particle_list = list(zip(*np.nonzero(simulated_image)))
 
-        if movie:
-            frame = simulated_image.astype(np.uint8)*255
-            video.write(np.dstack([frame, frame, frame]))
+        #if movie:
+        #    frame = simulated_image.astype(np.uint8)*255
+        #    video.write(np.dstack([frame, frame, frame]))
 
 
 
@@ -151,15 +158,17 @@ def rmc(image: np.array, num_particles, N, T_MAX, iterations, movie=False):
         temperature.append(T)
         error.append(chi_old)
         iteration.append(t)
+    print(np.mean(accept_rate))
     plt.figure(3)
-    plt.plot(np.log(temperature),accept_rate,'r-')
+    plt.plot((temperature),accept_rate,'ro')
     plt.title('Acceptance Rate')
     plt.ylabel('Acceptance Rate')
-    plt.xlabel('ln(Temperature)')
+    plt.xlabel('Temperature')
+    plt.xscale('log')
     plt.show()
 
 
-    if movie:
-        video.release()
+    #if movie:
+    #    video.release()
 
     return simulated_image

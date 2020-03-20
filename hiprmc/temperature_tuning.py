@@ -5,169 +5,245 @@ import matplotlib.pyplot as plt
 import hiprmc
 
 
-def temp_tuning(image: np.array, T_MAX, N, norm):
-    #if initial is None:
-    initial = hiprmc.random_initial(image)
+def temp_tuning(image: np.array, simulated_image: np.array,  T_MAX):
+
+    p = 0.5
+    tuning_iterations = 20
+    t_step = np.exp((np.log(0.000000001) - np.log(T_MAX)) / tuning_iterations)
+    #t_step = T_MAX / 1000.0
     T = T_MAX
-    # T = 0
-    simulated_image = initial.copy()
-    original = simulated_image
-    F_image = hiprmc.fourier_transform(image)
-    F_old = hiprmc.fourier_transform(simulated_image)
-    i_image = hiprmc.abs2(f_image)
+
+    f_old = hiprmc.fourier_transform(simulated_image)
+    i_image = image
     i_simulation = hiprmc.abs2(f_old)
-    norm = np.linalg.norm(f_image) ** 2
-    chi_old = hiprmc.chi_square(F_old, F_image)
-    error, count, accept_rate, temperature = [], [], [], []
-    t_step = T_MAX / 100.0
-    for t in progressbar.progressbar(range(0, 100)):
+    norm = np.linalg.norm(image)**2   ########change what you take the norm of, f_image or i_image
+    chi_old = hiprmc.chi_square(i_simulation, i_image, norm)
+
+    accept_rate, temperature, error, iteration = [], [], [], []
+    move_distance = int(image.shape[0] / 2)
+
+    particle_list = list(zip(*np.nonzero(simulated_image)))
+
+    for t in progressbar.progressbar(range(0, tuning_iterations)):
         move_count = 0.0
         acceptance = 0.0
-        T = T - t_step
-        for iter in range(0, np.count_nonzero(simulated_image == 1)):
+        T = T * t_step
+        for particle_number in range(0, len(particle_list)):
             move_count += 1
-            x_old = np.random.randint(0, image.shape[0])
-            y_old = np.random.randint(0, image.shape[1])
-            while simulated_image[x_old][y_old] != 1:
-                x_old = np.random.randint(0, image.shape[0])
-                y_old = np.random.randint(0, image.shape[1])
+            x_old = particle_list[particle_number][0]
+            y_old = particle_list[particle_number][1]
             x_new = np.random.randint(0, image.shape[0])
             y_new = np.random.randint(0, image.shape[1])
-            while np.sqrt((y_new - y_old) ** 2 + (x_new - x_old) ** 2) > 5:
-                x_new = np.random.randint(0, image.shape[0])
-                y_new = np.random.randint(0, image.shape[1])
-            old_point = simulated_image[x_old][y_old]
-            new_point = simulated_image[x_new][y_new]
+            old_point = new_point = simulated_image[x_old][y_old]
             while new_point == old_point:
-                x_new = np.random.randint(0, image.shape[0])
-                y_new = np.random.randint(0, image.shape[1])
+                x_new, y_new = hiprmc.random_from_circle(move_distance, x_old, y_old)
+                x_new, y_new = hiprmc.periodic(image, x_new, y_new)
                 new_point = simulated_image[x_new][y_new]
-            simulated_image[x_old][y_old] = new_point
-            simulated_image[x_new][y_new] = old_point
-            old_array = np.zeros_like(image)
-            old_array[x_old][y_old] = 1
-            new_array = np.zeros_like(image)
-            new_array[x_new][y_new] = 1
-            F_new = F_old - hiprmc.fourier_transform(old_array) + hiprmc.fourier_transform(new_array)
-            chi_new = hiprmc.chi_square(F_new, F_image)
+            f_new = f_old + hiprmc.DFT_Matrix(x_old, y_old, x_new, y_new, image.shape[0])
+            i_simulation = hiprmc.abs2(f_new)
+            chi_new = hiprmc.chi_square(i_simulation, i_image, norm)
             delta_chi = chi_new - chi_old
             acceptance, chi_old = hiprmc.Metropolis(x_old, y_old, x_new, y_new, old_point, new_point, delta_chi,
-                                                    simulated_image, T, acceptance, chi_old, chi_new, T_MAX, iter, N)
-            F_old = hiprmc.fourier_transform(simulated_image)
-        error.append(chi_old)
-        count.append(t)
-        accept_rate.append(acceptance / move_count)
+                                                    simulated_image, T, acceptance, chi_old, chi_new, T_MAX, iter,
+                                                    image.shape[0],
+                                                    t_step)
+            f_old = hiprmc.fourier_transform(simulated_image)
+
+        particle_list = list(zip(*np.nonzero(simulated_image)))
+
+        acceptance_rate = acceptance / move_count
+        accept_rate.append(acceptance_rate)
         temperature.append(T)
+        error.append(chi_old)
+        iteration.append(t)
+    plt.figure(5)
+    plt.plot(np.log(temperature), accept_rate, 'ro')
+    plt.title('Acceptance Rate')
+    plt.ylabel('Acceptance Rate')
+    plt.xlabel('ln(Temperature)')
+    #plt.xscale('log')
+    plt.show()
 
-    # def gaussian(x, a, b):
-    #     return a * (1 - np.exp(-(x / b) ** 2))
-    def sigmoid(x, a, b):
-        return 1.0 / (1.0 + np.exp(-a * (x - b)))
+    def sigmoid(x, a, b, c, L):
+       return L / (1.0 + np.exp(-a * (x - b))) + c
 
-    fit_params, fit_params_error = optimize.curve_fit(sigmoid, temperature, accept_rate, p0=[0.5, T_MAX / 2])
+    p0 = [max(accept_rate), np.median(temperature), 1, min(accept_rate)]
+    fit_params, fit_params_error = optimize.curve_fit(sigmoid, np.log(temperature), accept_rate, p0, maxfev=6000, method='dogbox')
 
-    # f = plt.figure()
-    # f.add_subplot(1, 2, 1)
-    # plt.plot(temperature, accept_rate, 'bo')
-    # plt.plot(temperature, sigmoid(temperature, *fit_params), 'r-')
-    # plt.ylabel('Acceptance Rate')
-    # plt.ylim([0, 1])
-    # plt.xlabel('Temperature')
-    # f.add_subplot(1, 2, 2)
+    temp_tstar = fit_params[1] - (fit_params[3]/fit_params[0])*np.log((1.0/p)-1.0)
+    print(temp_tstar)
+
+    plt.figure(4)
+    plt.plot(np.log(temperature), accept_rate, 'bo')
+    plt.plot(np.log(temperature), sigmoid(np.log(temperature), *fit_params), 'r-')
+    plt.ylabel('Acceptance Rate')
+    plt.xlabel('Temperature')
+    #plt.xscale('log')
+    plt.show()
+    # g.add_subplot(1, 2, 2)
     # plt.plot(count, error, 'k-')
     # plt.ylabel('Chi-Squared')
     # plt.xlabel('Monte Carlo Iteration')
     # plt.tight_layout()
     # plt.show()
 
-    # temp_tstar = abs(fit_params[1]) * np.sqrt(-np.log(1 - 0.333333 / fit_params[0]))
-    temp_tstar = fit_params[1] - np.log(2.3333) / fit_params[0]
-    t_min = max(0.001, temp_tstar - 0.2)
-    t_max = min(T_MAX, temp_tstar + 0.2)
-    t_step = (t_max - t_min) / 1000
-    T = t_max
-    simulated_image = original
+    t_min = max(np.log(0.0001), temp_tstar-2.0)
+    t_max = min(np.log(T_MAX), temp_tstar+2.0)
     print(t_min, t_max)
-    temperature2, accept_rate2 = [], []
-    for t in progressbar.progressbar(range(0, 1000)):
+
+   ############## TEMP RANGE 1 ###################
+
+
+    T = np.exp(t_max)
+    T_min = np.exp(t_min)
+
+    tuning_iterations = 200
+
+    t_step = np.exp((np.log(T_min) - np.log(T)) / tuning_iterations)
+
+    f_old = hiprmc.fourier_transform(simulated_image)
+    i_image = image
+    i_simulation = hiprmc.abs2(f_old)
+    norm = np.linalg.norm(image) ** 2  ########change what you take the norm of, f_image or i_image
+    chi_old = hiprmc.chi_square(i_simulation, i_image, norm)
+
+    accept_rate, temperature, error, iteration = [], [], [], []
+    move_distance = int(image.shape[0] / 2)
+
+    particle_list = list(zip(*np.nonzero(simulated_image)))
+
+    for t in progressbar.progressbar(range(0, tuning_iterations)):
         move_count = 0.0
         acceptance = 0.0
-        for iter in range(0, np.count_nonzero(simulated_image == 1)):
+        T = T * t_step
+        for particle_number in range(0, len(particle_list)):
             move_count += 1
-            x_old = np.random.randint(0, image.shape[0])
-            y_old = np.random.randint(0, image.shape[1])
-            while simulated_image[x_old][y_old] != 1:
-                x_old = np.random.randint(0, image.shape[0])
-                y_old = np.random.randint(0, image.shape[1])
+            x_old = particle_list[particle_number][0]
+            y_old = particle_list[particle_number][1]
             x_new = np.random.randint(0, image.shape[0])
             y_new = np.random.randint(0, image.shape[1])
-            while np.sqrt((y_new - y_old) ** 2 + (x_new - x_old) ** 2) > 15:
-                x_new = np.random.randint(0, image.shape[0])
-                y_new = np.random.randint(0, image.shape[1])
-            old_point = simulated_image[x_old][y_old]
-            new_point = simulated_image[x_new][y_new]
+            old_point = new_point = simulated_image[x_old][y_old]
             while new_point == old_point:
-                x_new = np.random.randint(0, image.shape[0])
-                y_new = np.random.randint(0, image.shape[1])
+                x_new, y_new = hiprmc.random_from_circle(move_distance, x_old, y_old)
+                x_new, y_new = hiprmc.periodic(image, x_new, y_new)
                 new_point = simulated_image[x_new][y_new]
-            simulated_image[x_old][y_old] = new_point
-            simulated_image[x_new][y_new] = old_point
-            old_array = np.zeros_like(image)
-            old_array[x_old][y_old] = 1
-            new_array = np.zeros_like(image)
-            new_array[x_new][y_new] = 1
-            F_new = F_old - hiprmc.fourier_transform(old_array) + hiprmc.fourier_transform(new_array)
-            chi_new = hiprmc.chi_square(F_new, F_image)
+            f_new = f_old + hiprmc.DFT_Matrix(x_old, y_old, x_new, y_new, image.shape[0])
+            i_simulation = hiprmc.abs2(f_new)
+            chi_new = hiprmc.chi_square(i_simulation, i_image, norm)
             delta_chi = chi_new - chi_old
             acceptance, chi_old = hiprmc.Metropolis(x_old, y_old, x_new, y_new, old_point, new_point, delta_chi,
-                                                    simulated_image, T, acceptance, chi_old, chi_new, T_MAX, iter, N)
-            F_old = hiprmc.fourier_transform(simulated_image)
+                                                    simulated_image, T, acceptance, chi_old, chi_new, T_MAX, iter,
+                                                    image.shape[0],
+                                                    t_step)
+            f_old = hiprmc.fourier_transform(simulated_image)
 
-        accept_rate2.append(acceptance / move_count)
-        temperature2.append(T)
-        T = T - t_step
+        particle_list = list(zip(*np.nonzero(simulated_image)))
 
-    fit_params, fit_params_error = optimize.curve_fit(sigmoid, temperature2, accept_rate2, p0=[0.5, temp_tstar])
+        acceptance_rate = acceptance / move_count
+        accept_rate.append(acceptance_rate)
+        temperature.append(T)
+        error.append(chi_old)
+        iteration.append(t)
 
-    # temp_tstar = abs(fit_params[1]) * np.sqrt(-np.log(1 - 0.333333 / fit_params[0]))
-    temp_tstar = fit_params[1] - np.log(2) / fit_params[0]
-    t_min = min(0.001, temp_tstar - 0.2)
-    t_max = min(T_MAX, temp_tstar + 0.2)
+    plt.figure(6)
+    plt.plot(np.log(temperature), accept_rate, 'ro')
+    plt.title('Acceptance Rate')
+    plt.ylabel('Acceptance Rate')
+    plt.xlabel('ln(Temperature)')
+    #plt.xscale('log')
+    plt.show()
+
+    p0 = [max(accept_rate), np.median(temperature), 1, min(accept_rate)]
+    fit_params, fit_params_error = optimize.curve_fit(sigmoid, np.log(temperature), accept_rate, p0, maxfev=6000, method='dogbox')
+    temp_tstar = fit_params[1] - (fit_params[3]/fit_params[0])*np.log((1.0/p)-1.0)
+    print(temp_tstar)
+
+    plt.figure(4)
+    plt.plot(np.log(temperature), accept_rate, 'ro')
+    plt.plot(np.log(temperature), sigmoid(np.log(temperature), *fit_params), 'b-')
+    plt.ylabel('Acceptance Rate')
+    plt.xlabel('Temperature')
+    plt.show()
+
+    t_min = max(t_min, temp_tstar-2.0)
+    t_max = min(t_max, temp_tstar+2.0)
+
+    ############## TEMP RANGE 2 ###################
+
+
+    # T = np.exp(t_max)
+    # t_min = np.exp(t_min)
     #
-    # f = plt.figure()
-    # f.add_subplot(1, 2, 1)
-    # plt.plot(temperature2, accept_rate2, 'bo')
-    # plt.plot(temperature2, sigmoid(temperature2, *fit_params), 'r-')
+    # tuning_iterations = 1000
+    #
+    # t_step = np.exp((np.log(t_min) - np.log(T)) / tuning_iterations)
+    #
+    # f_old = hiprmc.fourier_transform(simulated_image)
+    # i_image = image
+    # i_simulation = hiprmc.abs2(f_old)
+    # norm = np.linalg.norm(image) ** 2  ########change what you take the norm of, f_image or i_image
+    # chi_old = hiprmc.chi_square(i_simulation, i_image, norm)
+    #
+    # accept_rate, temperature, error, iteration = [], [], [], []
+    # move_distance = int(image.shape[0] / 2)
+    #
+    # particle_list = list(zip(*np.nonzero(simulated_image)))
+    #
+    # for t in progressbar.progressbar(range(0, tuning_iterations)):
+    #     move_count = 0.0
+    #     acceptance = 0.0
+    #     T = T * t_step
+    #     for particle_number in range(0, len(particle_list)):
+    #         move_count += 1
+    #         x_old = particle_list[particle_number][0]
+    #         y_old = particle_list[particle_number][1]
+    #         x_new = np.random.randint(0, image.shape[0])
+    #         y_new = np.random.randint(0, image.shape[1])
+    #         old_point = new_point = simulated_image[x_old][y_old]
+    #         while new_point == old_point:
+    #             x_new, y_new = hiprmc.random_from_circle(move_distance, x_old, y_old)
+    #             x_new, y_new = hiprmc.periodic(image, x_new, y_new)
+    #             new_point = simulated_image[x_new][y_new]
+    #         f_new = f_old + hiprmc.DFT_Matrix(x_old, y_old, x_new, y_new, image.shape[0])
+    #         i_simulation = hiprmc.abs2(f_new)
+    #         chi_new = hiprmc.chi_square(i_simulation, i_image, norm)
+    #         delta_chi = chi_new - chi_old
+    #         acceptance, chi_old = hiprmc.Metropolis(x_old, y_old, x_new, y_new, old_point, new_point, delta_chi,
+    #                                                 simulated_image, T, acceptance, chi_old, chi_new, T_MAX, iter,
+    #                                                 image.shape[0],
+    #                                                 t_step)
+    #         f_old = hiprmc.fourier_transform(simulated_image)
+    #
+    #     particle_list = list(zip(*np.nonzero(simulated_image)))
+    #
+    #     acceptance_rate = acceptance / move_count
+    #     accept_rate.append(acceptance_rate)
+    #     temperature.append(T)
+    #     error.append(chi_old)
+    #     iteration.append(t)
+    #
+    # plt.figure(6)
+    # plt.plot(np.log(temperature), accept_rate, 'ro')
+    # plt.title('Acceptance Rate')
     # plt.ylabel('Acceptance Rate')
-    # plt.ylim([0,1])
-    # plt.xlabel('Temperature')
-    # f.add_subplot(1, 2, 2)
-    # plt.plot(count, error, 'k-')
-    # plt.ylabel('Chi-Squared')
-    # plt.xlabel('Monte Carlo Iteration')
-    # plt.tight_layout()
+    # plt.xlabel('ln(Temperature)')
+    # #plt.xscale('log')
     # plt.show()
     #
-    # simulated_image = original
-
-    # f = plt.figure()
-    # f.add_subplot(1, 5, 1)
-    # plt.axis('off')
-    # plt.title("original image")
-    # f.add_subplot(1, 5, 2)
-    # plt.axis('off')
-    # plt.title("FFT of Image")
-    # f.add_subplot(1, 5, 3)
-    # plt.imshow(initial, cmap="Greys", origin="lower")
-    # plt.title("random start")
-    # plt.axis('off')
-    # f.add_subplot(1, 5, 4)
-    # plt.imshow(simulated_image, cmap="Greys", origin="lower")
-    # plt.title("updated")
-    # plt.axis('off')
-    # f.add_subplot(1, 5, 5)
-    # plt.imshow(np.log10(abs(hiprmc.fourier_transform(simulated_image))), origin='lower')
-    # plt.axis('off')
-    # plt.title("FFT of final state")
+    # p0 = [max(accept_rate), np.median(temperature), 1, min(accept_rate)]
+    # fit_params, fit_params_error = optimize.curve_fit(sigmoid, np.log(temperature), accept_rate, p0, maxfev=6000, method='dogbox')
+    #
+    # tstar = fit_params[1] - (fit_params[3]/fit_params[0])*np.log((1.0/p)-1.0)
+    #
+    # plt.figure(4)
+    # plt.plot(np.log(temperature), accept_rate, 'ro')
+    # plt.plot(np.log(temperature), sigmoid(np.log(temperature), *fit_params), 'b-')
+    # plt.ylabel('Acceptance Rate')
+    # plt.xlabel('Temperature')
+    # #plt.xscale('log')
     # plt.show()
-    return simulated_image, t_max, t_min
+    #
+    # t_max = np.exp(tstar + 1.0)
+    # t_min = np.exp(tstar - 1.0)
+    print(t_max,t_min)
+    return np.exp(t_max), np.exp(t_min)

@@ -14,7 +14,7 @@ def test_simulated():
 
     N = 50  # size of image (NxN)
     initial_image = np.zeros((N, N))
-    iterations = 2000
+    iterations = 4000
 
     # This bit creates a disc to try and model via RMC
     # for i in range(0, N):
@@ -26,7 +26,7 @@ def test_simulated():
     #             initial_image[i, j] = 0
 
     # # This creates a circle to model via RMC
-    rr, cc = circle(int(N/4), int(N/4), int(N/8))
+    rr, cc = circle(int(N/2), int(N/2), int(N/6))
     initial_image[rr, cc] = 1
 
     # This creates a square
@@ -35,12 +35,13 @@ def test_simulated():
     #f_image = initial_image
 
     num_particles = np.count_nonzero(initial_image == 1)
+    load = num_particles/initial_image.size
 
     i_image = hiprmc.abs2(hiprmc.fourier_transform(initial_image))
 
-    T = 3.0  # i_image.shape[0]  # temperature is on the same order as the image
+    T = 100.0  # i_image.shape[0]  # temperature is on the same order as the image
 
-    simulated_image = hiprmc.rmc(i_image, num_particles, N, T, iterations, movie=True)
+    simulated_image = hiprmc.rmc(i_image, T, iterations, load, movie=True)
 
     f = plt.figure(3)
     f.add_subplot(2, 2, 1)
@@ -94,7 +95,7 @@ def test_real():
 
     T = 40 # i_image.shape[0]  # temperature is on the same order as the image
 
-    simulated_image = hiprmc.rmc(image, N, T, iterations)
+    simulated_image = hiprmc.rmc(image, num_particles, N, T, iterations, movie=True)
 
     f = plt.figure(3)
     f.add_subplot(2, 2, 1)
