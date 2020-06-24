@@ -10,7 +10,8 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 
 def fourier_transform(m):
-    return fftpack.fft2(m)
+    return np.fft.fftshift(fftpack.fft2(m)) # shift low q to the center
+    #return fftpack.fft2(m)                 # don't shift low q to center
 
 @lru_cache(1)
 def memoized_dft(N):
@@ -88,22 +89,22 @@ def rmc(image: np.array, T_MAX, iterations, load, movie=False):
     print('Performing Temperature Tuning')
     simulated_image = random_initial(image, load)
     t_max, t_min = temp_tuning(image, simulated_image, T_MAX)
+    print(t_max,t_min)
     T = t_max
     print('Completed Temperature Tuning')
     print(t_max,t_min)
     ##########################################################
     ##### Temp Tuning:  comment for Tuning ###################
     ##########################################################
-    #simulated_image = random_initial(image, load)
-    #t_min = 0.00001
-    #T = T_MAX
+    # simulated_image = random_initial(image, load)
+    # t_min = 0.00001
+    # T = T_MAX
     ##########################################################
     ######### End Temp Tuning Indents ########################
     ##########################################################
 
     iterations = iterations
     t_step = np.exp((np.log(t_min) - np.log(T)) / iterations)   # exponential cooling rate
-    #t_step = (T_MAX - t_min)/iterations                             # linear cooling rate
     #if movie:
     #    import cv2
     #    from cv2 import VideoWriter, VideoWriter_fourcc
@@ -124,7 +125,6 @@ def rmc(image: np.array, T_MAX, iterations, load, movie=False):
     for t in progressbar.progressbar(range(0, iterations)):
         move_count = 0.0
         acceptance = 0.0
-        T = T * t_step
         for particle_number in range(0, len(particle_list)):
             move_count += 1
             x_old = particle_list[particle_number][0]
@@ -158,6 +158,7 @@ def rmc(image: np.array, T_MAX, iterations, load, movie=False):
         temperature.append(T)
         error.append(chi_old)
         iteration.append(t)
+        T = T*t_step
     print(np.mean(accept_rate))
     plt.figure(3)
     plt.plot((temperature),accept_rate,'ro')

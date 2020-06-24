@@ -14,19 +14,19 @@ def test_simulated():
 
     N = 50  # size of image (NxN)
     initial_image = np.zeros((N, N))
-    iterations = 4000
+    iterations = 2000
 
     # This bit creates a disc to try and model via RMC
     # for i in range(0, N):
     #     for j in range(0, N):
     #         r = np.sqrt((i - int(N / 2)) ** 2 + (j - int(N / 2)) ** 2)
-    #         if r >= 10 and r <= 11:
+    #         if 10 <= r <= 11:
     #             initial_image[i, j] = 1
     #         else:
     #             initial_image[i, j] = 0
 
     # # This creates a circle to model via RMC
-    rr, cc = circle(int(N/2), int(N/2), int(N/6))
+    rr, cc = circle(int(N/2), int(N/2), int(N/8))
     initial_image[rr, cc] = 1
 
     # This creates a square
@@ -39,7 +39,7 @@ def test_simulated():
 
     i_image = hiprmc.abs2(hiprmc.fourier_transform(initial_image))
 
-    T = 100.0  # i_image.shape[0]  # temperature is on the same order as the image
+    T = 1000.0  # i_image.shape[0]  # temperature is on the same order as the image
 
     simulated_image = hiprmc.rmc(i_image, T, iterations, load, movie=True)
 
